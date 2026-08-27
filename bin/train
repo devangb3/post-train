@@ -1,0 +1,74 @@
+#!/usr/bin/env python3
+"""./bin/train --config <path> --out <dir>
+
+Runs one full simulated training run and writes the artifacts the grader reads.
+
+This is WIRED AND WORKING as shipped. The only thing missing is the scheduler
+itself: it builds `curriculum.Scheduler`, which raises NotImplementedError until
+you fill it in. Run it with --baseline at any time to drive the shipped baseline
+policy instead and see what the artifacts and the numbers look like.
+
+You may restructure this file. If you do, keep the flags, the file names, and
+the field names below identical -- the grader runs this command and reads these
+artifacts directly.
+"""
+
+import argparse
+import json
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+import gymsim
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--config", required=True)
+    ap.add_argument("--out", required=True)
+    ap.add_argument("--baseline", action="store_true",
+                    help="drive gymsim.BaselineScheduler instead of yours")
+    args = ap.parse_args()
+
+    cfg = gymsim.load_config(args.config)
+    os.makedirs(args.out, exist_ok=True)
+    sim = gymsim.Simulator(cfg, out_dir=args.out)
+
+    if args.baseline:
+        Scheduler = gymsim.BaselineScheduler
+    else:
+        import curriculum
+        Scheduler = curriculum.Scheduler
+
+    sched = Scheduler(
+        sim.tasks, sim.budget, sim.cadence, sim.group, int(cfg["scheduler_seed"])
+    )
+
+    trace_path = os.path.join(args.out, "trace.jsonl")
+    with open(trace_path, "w", encoding="utf-8") as trace:
+        for i in range(sim.budget):
+            task_id = sched.choose()
+            passed = sim.rollout(task_id)
+            sched.observe(task_id, passed)
+            trace.write(json.dumps(
+                {"i": i, "task_id": task_id, "passed": bool(passed)},
+                sort_keys=True) + "\n")
+
+    sim.close()
+    # No evaluation score here on purpose. The only feedback a scheduler gets is
+    # the pass or fail of the rollouts it spent -- the same position you are in
+    # when you schedule a real training run. What it does print is what you
+    # could count from the trace yourself.
+    g = sim.group_stats
+    print(json.dumps({
+        "rollouts_spent": sim.rollouts_used,
+        "groups_closed": g["groups_closed"],
+        "groups_that_taught_something": g["groups_informative"],
+        "rollouts_in_groups_that_agreed": g["flat"],
+        "rollouts_left_in_unclosed_groups": g["partial"],
+    }, sort_keys=True, indent=2))
+
+
+if __name__ == "__main__":
+    main()

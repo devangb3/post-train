@@ -1,0 +1,16 @@
+{
+  "budget": 5760,
+  "cadence": 60,
+  "difficulty_salt": "practice-bank-v2",
+  "group": 8,
+  "scheduler_seed": 7,
+  "seed": 1234,
+  "skills": [
+    "planning",
+    "coding",
+    "reasoning",
+    "tool_use",
+    "math"
+  ],
+  "task_bank": "../tasks/train.jsonl"
+}

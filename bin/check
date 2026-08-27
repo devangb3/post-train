@@ -1,0 +1,284 @@
+#!/usr/bin/env python3
+"""./bin/check
+
+Checks that your submission is put together the way the grader expects. Run it
+before you submit.
+
+It does NOT tell you whether your scheduler is any good -- only whether it will
+run when we run it. Nothing here is scored; it is here so nobody loses points to
+plumbing.
+"""
+
+import filecmp
+import importlib
+import json
+import math
+import os
+import shutil
+import statistics
+import subprocess
+import sys
+import tempfile
+import time
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, ROOT)
+
+OK, BAD = "  ok   ", "  FAIL "
+failures = []
+
+# ---- grading-runtime model (calibrated on the grading fleet, 2026-08) -------
+#
+# Grading does not run your scheduler once. It re-runs it at several budgets,
+# across held-out task banks, in both modes -- the counts below are per class.
+# The timed drive fits your per-rollout cost curve and integrates it over this
+# schedule; the result is compared against how much scheduler compute grading
+# can absorb, expressed in units of the shipped baseline's full run measured on
+# the same machine. Ratios of two runs on YOUR machine equal the same ratio on
+# ours, so the verdict is hardware-independent by construction.
+#
+# The fit allows for cost that GROWS with training history: a scheduler that
+# re-scans everything it has seen on every call looks fine for the first
+# minute and is the single most common way a submission becomes ungradable.
+_GRADING_RUNS_PER_CLASS = {960: 24, 2880: 24, 5760: 168, 11520: 24}
+# How much total scheduler compute grading can absorb, in baseline-run
+# equivalents. Calibrated against real submissions with known grading
+# outcomes, not derived from theory: everything that has graded successfully
+# measures below this with margin, and what grading could not finish measures
+# above it with margin, and the two populations order monotonically in this
+# unit.
+_FAIL_RATIO = 700_000
+_DRIVE_CAP_S = 120.0             # bin/check refuses to sit through more than this per run
+
+
+def check(name, fn):
+    try:
+        detail = fn()
+    except Exception as e:
+        failures.append(name)
+        print(BAD + "%-26s %s: %s" % (name, type(e).__name__, e))
+        return False
+    if detail is None:
+        print(OK + name)
+    else:
+        print(OK + "%-26s %s" % (name, detail))
+    return True
+
+
+class _TooSlow(Exception):
+    def __init__(self, done, budget, elapsed, samples):
+        super().__init__(
+            "spent %.0fs on %d of %d rollouts -- grading re-runs your "
+            "scheduler hundreds of times and cannot finish"
+            % (elapsed, done, budget)
+        )
+        self.samples = samples
+
+
+def _fit(samples):
+    """Cumulative-cost model: C(i) ~ total * (i/n)^p from one run's samples.
+
+    CUMULATIVE, NOT PER-CALL, and that is load-bearing. A first cut fitted
+    binned MEDIANS of per-call cost, which rejects noise -- and also rejected
+    the one real cost profile that matters: schedulers whose expense is
+    concentrated in periodic spikes (heavy recomputation on the update
+    cadence). The medians saw only the cheap calls and projected milliseconds
+    from measured seconds. The cumulative curve keeps every microsecond
+    (it is anchored on the run's true total) while the exponent p still
+    separates flat-or-periodic cost (p ~ 1) from cost that grows with
+    history (p > 1). Fitted on the back half of the run so warmup transients
+    do not tilt it; clamped to [1, 3] so projection to other budgets is
+    never sublinear and never explodes on fit noise.
+    """
+    n = len(samples)
+    cum, running = [], 0.0
+    for s in samples:
+        running += s
+        cum.append(running)
+    total = max(running, 1e-9)
+    step = max(1, n // 24)
+    pts = [(math.log(i + 1), math.log(cum[i]))
+           for i in range(n // 2, n, step) if cum[i] > 0]
+    p = 1.0
+    if len(pts) >= 4:
+        mx = statistics.mean(q[0] for q in pts)
+        my = statistics.mean(q[1] for q in pts)
+        denom = sum((q[0] - mx) ** 2 for q in pts)
+        if denom:
+            p = sum((q[0] - mx) * (q[1] - my) for q in pts) / denom
+    p = min(max(p, 1.0), 3.0)
+    return total, p, n
+
+
+def _projected_run_seconds(fit, budget):
+    total, p, measured_budget = fit
+    return total * (budget / float(measured_budget)) ** p
+
+
+def main():
+    print("checking your submission...\n")
+    import gymsim
+    cfg = gymsim.load_config(os.path.join(ROOT, "config", "run.json"))
+
+    def imports():
+        importlib.invalidate_caches()
+        import curriculum
+        for cls in ("Scheduler", "PoisonScheduler"):
+            if not hasattr(curriculum, cls):
+                raise AttributeError("curriculum has no %s class" % cls)
+            for m in ("choose", "observe"):
+                if not callable(getattr(getattr(curriculum, cls), m, None)):
+                    raise AttributeError("%s has no %s() method" % (cls, m))
+        return "curriculum.Scheduler and curriculum.PoisonScheduler found"
+
+    if not check("imports", imports):
+        print("\n  your scheduler could not be imported -- nothing else can run")
+        sys.exit(1)
+
+    import curriculum
+
+    timings = {}
+    inits = {}
+
+    def _drive(cls_name, make):
+        """One full-budget run, validating task ids and timing every
+        choose()+observe() pair AND the constructor (the parts that are YOUR
+        code -- the simulator's own time is excluded). Construction is timed
+        because grading pays it once per re-run: a scheduler that front-loads
+        heavy precomputation into __init__ costs grading hundreds of
+        constructions while looking instant per call. Aborts past
+        _DRIVE_CAP_S rather than hanging."""
+        sim = gymsim.Simulator(cfg)
+        # THE PUBLIC TASK VIEW, exactly as grading constructs a scheduler.
+        # Passing `sim.tasks` raw here let a scheduler take a completely
+        # different code path in the check than in grading (observed: a
+        # thousandfold cost difference between the two views).
+        tasks = gymsim.public_tasks(sim.tasks)
+        t_init = time.perf_counter()
+        sched = make(sim, tasks)
+        inits[cls_name] = time.perf_counter() - t_init
+        valid = {t["task_id"] for t in tasks}
+        samples = []
+        started = time.perf_counter()
+        for i in range(sim.budget):
+            t0 = time.perf_counter()
+            tid = sched.choose()
+            t1 = time.perf_counter()
+            if tid not in valid:
+                raise ValueError("%s.choose() returned %r, which is not a task_id"
+                                 % (cls_name, tid))
+            passed = sim.rollout(tid)
+            t2 = time.perf_counter()
+            sched.observe(tid, passed)
+            samples.append((t1 - t0) + (time.perf_counter() - t2))
+            if i % 256 == 0 and time.perf_counter() - started > _DRIVE_CAP_S:
+                timings[cls_name] = samples
+                raise _TooSlow(i + 1, sim.budget,
+                               time.perf_counter() - started, samples)
+        sim.close()
+        timings[cls_name] = samples
+
+    def runs_within_budget():
+        """Both budgets in one check: the rollout budget (every call valid, no
+        errors, all 5,760 spent) and the time budget (the per-call cost curve,
+        fitted from the same drives and integrated over grading's re-run
+        schedule, must let grading complete).
+
+        One verdict on purpose. Splitting correctness from speed made a
+        submission pass one line and fail the other over what a candidate
+        experiences as a single fact about their run.
+        """
+        for cls_name in ("Scheduler", "PoisonScheduler"):
+            _drive(cls_name, lambda sim, tasks, c=cls_name: getattr(curriculum, c)(
+                tasks, sim.budget, sim.cadence, sim.group,
+                int(cfg["scheduler_seed"])))
+
+        # The shipped baseline, driven identically, is the yardstick that makes
+        # the speed half machine-independent: everything is a ratio to the
+        # baseline ON THIS MACHINE, and a ratio of two runs here equals the
+        # same ratio on the grading hardware.
+        _drive("_baseline", lambda sim, tasks: gymsim.BaselineScheduler(
+            tasks, sim.budget, sim.cadence, sim.group,
+            int(cfg["scheduler_seed"])))
+        base_run_s = max(sum(timings["_baseline"]), 1e-4)
+
+        # Deliberately vague on failure: no ratios, exponents or durations in
+        # the output. The README's rule (keep choose()/observe() fast, do not
+        # grow with history) is the one place the guidance lives; a numeric
+        # verdict here would only invite tuning against the measurement.
+        # Per-run cost = construction + the fitted per-call curve integrated to
+        # that run's budget. Both halves in the same units as the baseline's
+        # own per-run cost, so the ratio stays hardware-independent.
+        runs_per_class = sum(_GRADING_RUNS_PER_CLASS.values())
+        base_unit = base_run_s + inits.get("_baseline", 0.0)
+        total_ratio = sum(
+            (inits[c] * runs_per_class
+             + sum(n * _projected_run_seconds(_fit(timings[c]), b)
+                   for b, n in _GRADING_RUNS_PER_CLASS.items())) / base_unit
+            for c in ("Scheduler", "PoisonScheduler"))
+        if total_ratio >= _FAIL_RATIO:
+            raise RuntimeError("too slow for grading to complete")
+        return "%d rollouts each, both classes, within range" % cfg["budget"]
+
+    check("runs within budget", runs_within_budget)
+
+    tmp = tempfile.mkdtemp(prefix="ladder_check_")
+    try:
+        def writes_artifacts():
+            # timeout: a scheduler slow enough to sit here for ten minutes has
+            # already failed the runtime check above; do not hang the whole
+            # self-check proving it a second time.
+            r = subprocess.run(
+                [sys.executable, os.path.join(ROOT, "bin", "train"),
+                 "--config", os.path.join(ROOT, "config", "run.json"),
+                 "--out", os.path.join(tmp, "a")],
+                capture_output=True, text=True, cwd=ROOT, timeout=600)
+            if r.returncode != 0:
+                last = [l for l in r.stderr.strip().splitlines() if l.strip()]
+                raise RuntimeError("bin/train exited %d: %s"
+                                   % (r.returncode, last[-1] if last else "no output"))
+            missing = [f for f in ("trace.jsonl", "meter.jsonl")
+                       if not os.path.exists(os.path.join(tmp, "a", f))]
+            if missing:
+                raise FileNotFoundError("bin/train did not write: " + ", ".join(missing))
+            return "bin/train wrote the trace and the meter"
+
+        if check("bin/train works", writes_artifacts):
+            def spends_budget():
+                n = sum(1 for _ in open(os.path.join(tmp, "a", "trace.jsonl")))
+                if n != cfg["budget"]:
+                    raise ValueError("spent %d rollouts, expected %d" % (n, cfg["budget"]))
+                return "%d rollouts" % n
+            check("spends the budget", spends_budget)
+
+            def reproduces():
+                subprocess.run(
+                    [sys.executable, os.path.join(ROOT, "bin", "train"),
+                     "--config", os.path.join(ROOT, "config", "run.json"),
+                     "--out", os.path.join(tmp, "b")],
+                    capture_output=True, text=True, cwd=ROOT, check=True,
+                    timeout=600)
+                for f in ("trace.jsonl", "meter.jsonl"):
+                    if not filecmp.cmp(os.path.join(tmp, "a", f),
+                                       os.path.join(tmp, "b", f), shallow=False):
+                        raise ValueError(
+                            "%s differs between two identical runs -- seed any"
+                            " randomness from the `seed` you are given, and do"
+                            " not read the clock" % f)
+                return "two identical runs match"
+            check("reproducible", reproduces)
+
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+    print()
+    if failures:
+        print("  %d check(s) failed: %s" % (len(failures), ", ".join(failures)))
+        print("  fix these before submitting -- we run the same commands.")
+        sys.exit(1)
+    print("  all checks passed. Note this says nothing about how well your")
+    print("  scheduler does, only that it runs the way we expect.")
+
+
+if __name__ == "__main__":
+    main()

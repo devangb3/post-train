@@ -1,0 +1,120 @@
+{"skills": {"tool_use": 1.0}, "task_id": "task_0086910b"}
+{"skills": {"coding": 1.0}, "task_id": "task_010a421c"}
+{"skills": {"coding": 1.0}, "task_id": "task_045ec0db"}
+{"skills": {"coding": 1.0}, "task_id": "task_04cbbce1"}
+{"skills": {"planning": 1.0}, "task_id": "task_04d796b7"}
+{"skills": {"math": 0.498, "planning": 1.0}, "task_id": "task_0a6098b5"}
+{"skills": {"math": 0.486, "planning": 1.0}, "task_id": "task_0e561c8e"}
+{"skills": {"math": 0.51, "planning": 1.0}, "task_id": "task_0e64d325"}
+{"skills": {"tool_use": 1.0}, "task_id": "task_0f18c37f"}
+{"skills": {"reasoning": 1.0, "tool_use": 0.274}, "task_id": "task_120dd847"}
+{"skills": {"tool_use": 1.0}, "task_id": "task_13ca9f05"}
+{"skills": {"coding": 0.253, "tool_use": 1.0}, "task_id": "task_1584c08d"}
+{"skills": {"math": 0.511, "planning": 1.0}, "task_id": "task_199920fc"}
+{"skills": {"coding": 1.0}, "task_id": "task_1c4c5fc5"}
+{"skills": {"tool_use": 1.0}, "task_id": "task_211214ab"}
+{"skills": {"math": 0.505, "planning": 1.0}, "task_id": "task_22a052da"}
+{"skills": {"planning": 1.0}, "task_id": "task_26ca6ede"}
+{"skills": {"math": 0.478, "planning": 1.0}, "task_id": "task_2ba0bc7f"}
+{"skills": {"planning": 1.0, "reasoning": 0.256}, "task_id": "task_2e59410d"}
+{"skills": {"tool_use": 1.0}, "task_id": "task_30b0bcb5"}
+{"skills": {"math": 1.0, "planning": 0.251}, "task_id": "task_311995ca"}
+{"skills": {"planning": 1.0, "reasoning": 0.382}, "task_id": "task_32b645a0"}
+{"skills": {"coding": 1.0}, "task_id": "task_33209770"}
+{"skills": {"math": 1.0}, "task_id": "task_33f7f007"}
+{"skills": {"coding": 1.0}, "task_id": "task_39b8d60e"}
+{"skills": {"planning": 0.301, "tool_use": 1.0}, "task_id": "task_3a6226a5"}
+{"skills": {"planning": 1.0}, "task_id": "task_3b16ac85"}
+{"skills": {"tool_use": 1.0}, "task_id": "task_3d755c6f"}
+{"skills": {"tool_use": 1.0}, "task_id": "task_41c91109"}
+{"skills": {"tool_use": 1.0}, "task_id": "task_4348ed5d"}
+{"skills": {"planning": 1.0}, "task_id": "task_47d9bd57"}
+{"skills": {"coding": 1.0}, "task_id": "task_49be7468"}
+{"skills": {"coding": 0.232, "planning": 1.0}, "task_id": "task_4d987a29"}
+{"skills": {"tool_use": 1.0}, "task_id": "task_4eee5324"}
+{"skills": {"coding": 0.248, "planning": 1.0}, "task_id": "task_4fa242ef"}
+{"skills": {"coding": 1.0}, "task_id": "task_54ad9f56"}
+{"skills": {"coding": 1.0}, "task_id": "task_55b08d29"}
+{"skills": {"math": 1.0}, "task_id": "task_569090f8"}
+{"skills": {"math": 0.479, "planning": 1.0}, "task_id": "task_5741788c"}
+{"skills": {"math": 1.0, "reasoning": 0.313}, "task_id": "task_5880a3b9"}
+{"skills": {"tool_use": 1.0}, "task_id": "task_5a24b6c7"}
+{"skills": {"tool_use": 1.0}, "task_id": "task_5a3e64a8"}
+{"skills": {"tool_use": 1.0}, "task_id": "task_5bc4c29c"}
+{"skills": {"coding": 1.0, "planning": 0.252}, "task_id": "task_5ee1f5ef"}
+{"skills": {"reasoning": 1.0, "tool_use": 0.404}, "task_id": "task_5f1d177c"}
+{"skills": {"math": 1.0, "tool_use": 0.245}, "task_id": "task_5f6da56a"}
+{"skills": {"tool_use": 1.0}, "task_id": "task_61f17e1c"}
+{"skills": {"coding": 1.0}, "task_id": "task_69c95e2f"}
+{"skills": {"planning": 1.0}, "task_id": "task_6b1ad584"}
+{"skills": {"math": 0.48, "planning": 1.0}, "task_id": "task_6ba20260"}
+{"skills": {"coding": 1.0}, "task_id": "task_6f231526"}
+{"skills": {"coding": 1.0}, "task_id": "task_72006f7b"}
+{"skills": {"planning": 1.0}, "task_id": "task_74aa0931"}
+{"skills": {"tool_use": 1.0}, "task_id": "task_78e7d174"}
+{"skills": {"coding": 1.0}, "task_id": "task_79ae0d76"}
+{"skills": {"coding": 1.0}, "task_id": "task_79ec46a4"}
+{"skills": {"coding": 1.0, "tool_use": 0.382}, "task_id": "task_7c2a3b67"}
+{"skills": {"coding": 1.0}, "task_id": "task_7f72d024"}
+{"skills": {"coding": 1.0, "reasoning": 0.226}, "task_id": "task_80da54ed"}
+{"skills": {"coding": 1.0, "reasoning": 0.217}, "task_id": "task_8162dcbd"}
+{"skills": {"planning": 1.0}, "task_id": "task_81b12124"}
+{"skills": {"planning": 0.236, "reasoning": 1.0}, "task_id": "task_846d727d"}
+{"skills": {"coding": 1.0}, "task_id": "task_84804018"}
+{"skills": {"coding": 1.0}, "task_id": "task_85d222c3"}
+{"skills": {"coding": 1.0}, "task_id": "task_8a46a7e8"}
+{"skills": {"math": 1.0}, "task_id": "task_8ab26835"}
+{"skills": {"coding": 1.0}, "task_id": "task_917c0fae"}
+{"skills": {"coding": 1.0, "math": 0.445}, "task_id": "task_93225fb6"}
+{"skills": {"tool_use": 1.0}, "task_id": "task_93523c84"}
+{"skills": {"tool_use": 1.0}, "task_id": "task_959084fa"}
+{"skills": {"planning": 1.0}, "task_id": "task_9882c403"}
+{"skills": {"tool_use": 1.0}, "task_id": "task_9a2a7cfc"}
+{"skills": {"planning": 0.456, "tool_use": 1.0}, "task_id": "task_9c351754"}
+{"skills": {"math": 0.484, "planning": 1.0}, "task_id": "task_a1fdb1e3"}
+{"skills": {"reasoning": 1.0}, "task_id": "task_a22a693d"}
+{"skills": {"tool_use": 1.0}, "task_id": "task_a2ab7fa1"}
+{"skills": {"reasoning": 1.0, "tool_use": 0.361}, "task_id": "task_a6fce1d4"}
+{"skills": {"planning": 1.0}, "task_id": "task_a8edbe87"}
+{"skills": {"coding": 1.0}, "task_id": "task_aa9fc275"}
+{"skills": {"coding": 1.0, "tool_use": 0.305}, "task_id": "task_ac5be271"}
+{"skills": {"tool_use": 1.0}, "task_id": "task_ac867809"}
+{"skills": {"coding": 0.359, "planning": 1.0}, "task_id": "task_acc196c8"}
+{"skills": {"coding": 1.0}, "task_id": "task_ad1a33bb"}
+{"skills": {"coding": 1.0, "tool_use": 0.248}, "task_id": "task_b03f1a3d"}
+{"skills": {"planning": 1.0, "reasoning": 0.302}, "task_id": "task_bad37a55"}
+{"skills": {"math": 1.0}, "task_id": "task_bb921d3d"}
+{"skills": {"coding": 0.217, "planning": 1.0}, "task_id": "task_bc160391"}
+{"skills": {"math": 0.204, "tool_use": 1.0}, "task_id": "task_bed2baf6"}
+{"skills": {"tool_use": 1.0}, "task_id": "task_c043acbc"}
+{"skills": {"math": 1.0, "tool_use": 0.225}, "task_id": "task_c0fa1fca"}
+{"skills": {"coding": 1.0, "planning": 0.316}, "task_id": "task_c158a9de"}
+{"skills": {"coding": 1.0}, "task_id": "task_c5c21669"}
+{"skills": {"coding": 1.0}, "task_id": "task_c6597397"}
+{"skills": {"tool_use": 1.0}, "task_id": "task_ca30b4af"}
+{"skills": {"math": 0.497, "planning": 1.0}, "task_id": "task_cd2e7bd9"}
+{"skills": {"math": 0.483, "planning": 1.0}, "task_id": "task_cf8773ff"}
+{"skills": {"coding": 1.0, "tool_use": 0.46}, "task_id": "task_d4ba0c0e"}
+{"skills": {"coding": 1.0}, "task_id": "task_d70cc030"}
+{"skills": {"math": 1.0}, "task_id": "task_dbe76586"}
+{"skills": {"math": 1.0}, "task_id": "task_dd66b527"}
+{"skills": {"planning": 1.0}, "task_id": "task_df9248c6"}
+{"skills": {"coding": 1.0, "reasoning": 0.284}, "task_id": "task_e0ec63c5"}
+{"skills": {"planning": 1.0, "tool_use": 0.399}, "task_id": "task_e366bb4a"}
+{"skills": {"coding": 0.245, "planning": 1.0}, "task_id": "task_e6034fd0"}
+{"skills": {"math": 0.495, "planning": 1.0}, "task_id": "task_e7ea3ec2"}
+{"skills": {"tool_use": 1.0}, "task_id": "task_e8759b11"}
+{"skills": {"coding": 1.0}, "task_id": "task_eb1f8a1a"}
+{"skills": {"planning": 1.0}, "task_id": "task_edbfba87"}
+{"skills": {"math": 1.0}, "task_id": "task_ef834837"}
+{"skills": {"coding": 1.0}, "task_id": "task_efdc6896"}
+{"skills": {"coding": 1.0}, "task_id": "task_f0e4c1ca"}
+{"skills": {"tool_use": 1.0}, "task_id": "task_f1637e87"}
+{"skills": {"math": 0.209, "planning": 1.0}, "task_id": "task_f163a76d"}
+{"skills": {"planning": 1.0}, "task_id": "task_f2c06668"}
+{"skills": {"reasoning": 1.0, "tool_use": 0.45}, "task_id": "task_f31aeb73"}
+{"skills": {"coding": 1.0}, "task_id": "task_f37d3430"}
+{"skills": {"coding": 1.0}, "task_id": "task_f398fce9"}
+{"skills": {"tool_use": 1.0}, "task_id": "task_f4b285eb"}
+{"skills": {"tool_use": 1.0}, "task_id": "task_f653262f"}
+{"skills": {"coding": 1.0}, "task_id": "task_ffe4de36"}
