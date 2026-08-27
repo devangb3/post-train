@@ -200,8 +200,8 @@ class PoisonScheduler(Scheduler):
         # A negative task can look like an excellent frontier task while it
         # drives a skill downward. Diversification bounds the damage before
         # the outcome trend contains enough evidence to identify it.
-        if task_id == self._last_choice and self._choice_run >= 3:
-            score *= 0.45
+        if task_id == self._last_choice and self._choice_run >= 2:
+            score *= 0.35
 
         # Risk is deliberately soft: clean banks must not lose a useful task
         # forever because two small groups happened to arrive in a bad order.
