@@ -185,7 +185,19 @@ class PoisonScheduler(Scheduler):
             self._explore_at += 1
         else:
             self._selection_alarm = self._bank_alarm()
-            task_id = max(self._task_ids, key=self._poison_score)
+            candidates = self._task_ids
+            # A poisoned frontier task can continue to outscore every
+            # alternative even after a soft penalty. Force one different
+            # group after two repeats so exposure is actually bounded while
+            # allowing the frontier task to compete again immediately after.
+            if self._choice_run >= 2:
+                alternatives = [
+                    task_id for task_id in self._task_ids
+                    if task_id != self._last_choice
+                ]
+                if alternatives:
+                    candidates = alternatives
+            task_id = max(candidates, key=self._poison_score)
 
         if task_id == self._last_choice:
             self._choice_run += 1
@@ -222,14 +234,6 @@ class PoisonScheduler(Scheduler):
 
     def _poison_score(self, task_id):
         score = self._score(task_id)
-
-        # A negative task can look like an excellent frontier task while it
-        # drives a skill downward. Diversification bounds the damage before
-        # the outcome trend contains enough evidence to identify it. Even a
-        # quiet bank keeps the two-group cap: shared-skill gains can mask a
-        # moderate poison rate in the bank-wide signal.
-        if task_id == self._last_choice and self._choice_run >= 2:
-            score *= 0.45 - 0.20 * self._selection_alarm
 
         # Risk is deliberately soft: clean banks must not lose a useful task
         # forever because two small groups happened to arrive in a bad order.
