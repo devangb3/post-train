@@ -165,6 +165,15 @@ class PoisonScheduler(Scheduler):
         self._risk_checked_at = {task_id: 0 for task_id in self._task_ids}
         self._last_choice = None
         self._choice_run = 0
+        self._rollouts_seen = 0
+        self._cadence_credit = {}
+        self._landed_credit = []
+        self._task_observation = {task_id: None for task_id in self._task_ids}
+        self._causal_sum = {task_id: 0.0 for task_id in self._task_ids}
+        self._causal_weight = {task_id: 0.0 for task_id in self._task_ids}
+        self._bank_up = 0
+        self._bank_down = 0
+        self._selection_alarm = 0.35
 
     def choose(self):
         """Choose a frontier task, with exposure and deterioration guards."""
@@ -175,6 +184,7 @@ class PoisonScheduler(Scheduler):
             task_id = self._explore[self._explore_at]
             self._explore_at += 1
         else:
+            self._selection_alarm = self._bank_alarm()
             task_id = max(self._task_ids, key=self._poison_score)
 
         if task_id == self._last_choice:
@@ -191,21 +201,40 @@ class PoisonScheduler(Scheduler):
         closing = task_id == self._active and self._active_n + 1 == self.group
         group_passes = self._active_passes + int(bool(passed))
         super().observe(task_id, passed)
+        self._rollouts_seen += 1
         if closing:
             self._record_poison_evidence(task_id, group_passes)
+            spread = (group_passes * (self.group - group_passes) /
+                      float(self.group * self.group))
+            if spread > 0.0:
+                self._cadence_credit[task_id] = (
+                    self._cadence_credit.get(task_id, 0.0) + spread
+                )
+            self._record_cadence_observation(task_id, group_passes)
+        if self._rollouts_seen % self.cadence == 0:
+            epoch = self._rollouts_seen // self.cadence
+            self._landed_credit.append((epoch, self._cadence_credit))
+            # Only recent credit can be attributed with useful confidence;
+            # bounding this list also keeps per-group work constant over time.
+            if len(self._landed_credit) > 4:
+                del self._landed_credit[0]
+            self._cadence_credit = {}
 
     def _poison_score(self, task_id):
         score = self._score(task_id)
 
         # A negative task can look like an excellent frontier task while it
         # drives a skill downward. Diversification bounds the damage before
-        # the outcome trend contains enough evidence to identify it.
+        # the outcome trend contains enough evidence to identify it. Even a
+        # quiet bank keeps the two-group cap: shared-skill gains can mask a
+        # moderate poison rate in the bank-wide signal.
         if task_id == self._last_choice and self._choice_run >= 2:
-            score *= 0.35
+            score *= 0.45 - 0.20 * self._selection_alarm
 
         # Risk is deliberately soft: clean banks must not lose a useful task
         # forever because two small groups happened to arrive in a bad order.
-        return score * math.exp(-5.0 * self._risk[task_id])
+        risk_weight = 4.0 + 4.0 * self._selection_alarm
+        return score * math.exp(-risk_weight * self._risk[task_id])
 
     def _record_poison_evidence(self, task_id, passes):
         history = self._history[task_id]
@@ -235,3 +264,75 @@ class PoisonScheduler(Scheduler):
         else:
             risk *= 0.96
         self._risk[task_id] = min(1.0, max(0.0, risk))
+
+    def _record_cadence_observation(self, task_id, passes):
+        # Label outcomes by the epoch in which the group started. A group that
+        # closes exactly on an update boundary contains pre-update outcomes and
+        # must not be mistaken for evidence about the update it just caused.
+        epoch = max(0, (self._rollouts_seen - self.group) // self.cadence)
+        previous = self._task_observation[task_id]
+        self._task_observation[task_id] = (epoch, passes)
+        if previous is None or previous[0] >= epoch:
+            return
+
+        exposures = {}
+        for landed_epoch, sources in self._landed_credit:
+            if previous[0] < landed_epoch <= epoch:
+                for source, spread in sources.items():
+                    overlap = sum(
+                        min(weight, self._shares[source].get(skill, 0.0))
+                        for skill, weight in self._shares[task_id].items()
+                    )
+                    if overlap > 0.0:
+                        exposures[source] = (exposures.get(source, 0.0) +
+                                             spread * overlap)
+        total = sum(exposures.values())
+        if total <= 0.0:
+            return
+
+        delta = (passes - previous[1]) / float(self.group)
+        if delta >= 1.0 / self.group:
+            self._bank_up += 1
+        elif delta <= -1.0 / self.group:
+            self._bank_down += 1
+
+        for source, exposure in exposures.items():
+            weight = exposure / total
+            self._causal_sum[source] += delta * weight
+            self._causal_weight[source] += weight
+
+            # Cross-task declines are weaker evidence than a task's own trend,
+            # but they are the only way to notice damage to related tasks.
+            risk = self._risk[source]
+            if delta < -0.125:
+                risk += 0.32 * (-delta - 0.05) * weight
+            elif delta > 0.125:
+                risk -= 0.12 * (delta - 0.05) * weight
+            self._risk[source] = min(1.0, max(0.0, risk))
+
+    def _bank_alarm(self):
+        """Estimate whether diversification is worth its clean-bank cost."""
+        comparisons = self._bank_up + self._bank_down
+        if comparisons < 12:
+            return 0.35
+
+        decline_rate = (self._bank_down + 2.0) / (comparisons + 4.0)
+        global_alarm = min(1.0, max(0.0,
+            (decline_rate - 0.42) / 0.25
+        ))
+
+        measured = 0
+        negative = 0
+        for task_id in self._task_ids:
+            weight = self._causal_weight[task_id]
+            if weight >= 0.75:
+                measured += 1
+                if self._causal_sum[task_id] / weight < -0.06:
+                    negative += 1
+        if measured >= 6:
+            prevalence = negative / float(measured)
+            prevalence_alarm = min(1.0, max(0.0,
+                (prevalence - 0.15) / 0.35
+            ))
+            return 0.65 * global_alarm + 0.35 * prevalence_alarm
+        return global_alarm
